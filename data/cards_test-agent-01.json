@@ -1,0 +1,33 @@
+{
+  "8798-9995-8576-8332": {
+    "card_type": "check",
+    "product_name": "일반체크카드",
+    "alias": "데일리카드",
+    "linked_account": "110-40-923",
+    "status": "cancelled",
+    "issued_at": "2026-09-29",
+    "usages": [
+      {
+        "date": "2026-09-29",
+        "amount": 50000
+      }
+    ]
+  },
+  "2013-5350-2669-5033": {
+    "card_type": "credit",
+    "product_name": "일반신용카드",
+    "alias": "메인카드",
+    "linked_account": "110-40-923",
+    "status": "active",
+    "issued_at": "2026-09-29",
+    "usages": [
+      {
+        "date": "2026-09-29",
+        "amount": 30000
+      }
+    ],
+    "payment_day": 20,
+    "last_settled_date": "2026-09-29",
+    "overdue": false
+  }
+}

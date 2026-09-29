@@ -1,0 +1,13 @@
+{
+  "B448683": {
+    "bill_type": "전기",
+    "alias": "전기",
+    "customer_number": "1234567890",
+    "linked_account": "110-97-859",
+    "amount": 0,
+    "payment_day": 20,
+    "last_settled_date": "2026-09-29",
+    "status": "active",
+    "overdue": false
+  }
+}

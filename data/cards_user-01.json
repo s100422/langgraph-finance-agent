@@ -1,0 +1,43 @@
+{
+  "2388-1945-6565-3933": {
+    "card_type": "credit",
+    "product_name": "일반신용카드",
+    "alias": "일반신용카드",
+    "linked_account": "110-97-859",
+    "status": "active",
+    "issued_at": "2026-09-29",
+    "usages": [],
+    "payment_day": 25,
+    "last_settled_date": "2026-09-29",
+    "overdue": false
+  },
+  "5104-2231-9087-4412": {
+    "card_type": "check",
+    "product_name": "일반체크카드",
+    "alias": "생활비카드",
+    "linked_account": "110-97-859",
+    "status": "active",
+    "issued_at": "2026-09-29",
+    "usages": [
+      {"date": "2026-09-28", "amount": 15000},
+      {"date": "2026-09-29", "amount": 32000}
+    ]
+  },
+  "7702-3364-1298-5501": {
+    "card_type": "credit",
+    "product_name": "일반신용카드",
+    "alias": "쇼핑카드",
+    "linked_account": "110-97-859",
+    "status": "active",
+    "issued_at": "2026-09-01",
+    "usages": [
+      {"date": "2026-09-10", "amount": 45000},
+      {"date": "2026-09-15", "amount": 68000},
+      {"date": "2026-09-26", "amount": 30000},
+      {"date": "2026-09-28", "amount": 52000}
+    ],
+    "payment_day": 25,
+    "last_settled_date": "2026-09-25",
+    "overdue": false
+  }
+}

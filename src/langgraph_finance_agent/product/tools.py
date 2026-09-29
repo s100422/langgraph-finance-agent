@@ -3,8 +3,6 @@ import random
 from langgraph_finance_agent.account.tools import load_accounts, withdraw
 from langgraph_finance_agent.tools import latest_payment_date, load_json, save_json
 
-# 예적금은 은행이 미리 정해놓은 상품(이름-기간-금리 고정) 중에서 고르는 거라 카탈로그로 고정.
-# 대출은 신청자가 금액/기간을 직접 정하는 쪽이 현실적이라 금리만 고정해두고 따로 관리(LOAN_RATE).
 PRODUCT_CATALOG = {
     "정기예금 12개월": {"product_type": "savings", "term_months": 12, "rate": 0.03},
     "정기예금 24개월": {"product_type": "savings", "term_months": 24, "rate": 0.035},
@@ -40,7 +38,7 @@ def find_product_id(products: dict, hint: str | None) -> str | None:
         return None
 
     for pid, product in active.items():
-        if pid == hint or product["alias"] == hint:
+        if pid == hint or hint in product["alias"] or product["alias"] in hint:
             return pid
 
     return None
@@ -54,7 +52,6 @@ def format_catalog() -> str:
 
 
 def resolve_catalog_choice(choice: str) -> tuple[str, dict] | None:
-    """사용자가 번호("1")로 답하든 상품명("정기예금 12개월")으로 답하든 둘 다 받아줌."""
     names = list(PRODUCT_CATALOG.keys())
 
     if choice.isdigit():
@@ -95,7 +92,6 @@ def format_products(products: dict) -> str:
 
 
 def settle_due_loans(user_id: str, today: str) -> None:
-    """상품 도메인 요청이 들어올 때마다 호출 — 실시간 스케줄러 없이 상환일 지연 정산."""
     products = load_products(user_id)
     accounts = load_accounts(user_id)
     changed = False
@@ -130,8 +126,6 @@ def settle_due_loans(user_id: str, today: str) -> None:
 
 
 def settle_due_installments(user_id: str, today: str) -> None:
-    """적금은 가입할 때 목돈을 한 번에 받는 게 아니라, 매달 정해진 날 납입액만큼
-    계좌에서 빠져나가서 쌓이는 구조 — 대출 상환과 같은 지연 정산 패턴 재사용."""
     products = load_products(user_id)
     accounts = load_accounts(user_id)
     changed = False

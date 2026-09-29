@@ -28,7 +28,7 @@ def find_card_number(cards: dict, hint: str | None) -> str | None:
         return None
 
     for num, card in active.items():
-        if num == hint or card["alias"] == hint:
+        if num == hint or hint in card["alias"] or card["alias"] in hint:
             return num
 
     return None
@@ -43,8 +43,16 @@ def format_cards(cards: dict) -> str:
     for num, card in cards.items():
         status = "" if card["status"] == "active" else " (해지됨)"
         overdue = " (연체)" if card.get("overdue") else ""
+        if card["card_type"] == "credit":
+            pending = sum(
+                usage["amount"] for usage in card["usages"]
+                if usage["date"] > card["last_settled_date"]
+            )
+            payment_info = f" (결제일 매달 {card['payment_day']}일, 다음 결제 예정액 {pending:,}원)"
+        else:
+            payment_info = ""
         results.append(
-            f"[{card['product_name']}/{card['alias']}] {num} — {type_label[card['card_type']]}{status}{overdue}"
+            f"[{card['product_name']}/{card['alias']}] {num} — {type_label[card['card_type']]}{payment_info}{status}{overdue}"
         )
         for usage in card["usages"]:
             results.append(f"  {usage['date']} 사용 {usage['amount']:,}원")
@@ -53,7 +61,6 @@ def format_cards(cards: dict) -> str:
 
 
 def settle_due_credit_cards(user_id: str, today: str) -> None:
-    """카드 도메인 요청이 들어올 때마다 호출 — 실시간 스케줄러 없이 결제일 지연 정산."""
     cards = load_cards(user_id)
     accounts = load_accounts(user_id)
     changed = False

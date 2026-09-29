@@ -20,12 +20,6 @@ def save_json(prefix: str, user_id: str, data: dict) -> None:
 
 
 def latest_payment_date(payment_day: int, today: str) -> str:
-    """오늘 기준으로 가장 최근에 지난(오늘 포함) 결제일을 YYYY-MM-DD로 리턴.
-
-    카드 결제일/대출 상환일처럼 매달 정해진 날짜에 자동 정산되는 걸
-    실시간 스케줄러 없이 '도메인 진입 시점에 지연 정산'으로 흉내낼 때 씀.
-    """
-    # ponytail: 결제일 28일로 캡 — 29~31일 매달 유효성 계산 생략, 필요해지면 calendar.monthrange로 교체
     day = min(payment_day, 28)
     today_date = date.fromisoformat(today)
     candidate = today_date.replace(day=day)

@@ -15,17 +15,18 @@ class ProductState(TypedDict):
     today: str
     request: str
     response: str
-    action: Literal["subscribe", "search", "terminate", "apply_loan", "unsupported"]
+    action: Literal["subscribe", "search", "terminate", "apply_loan", "rename", "unsupported"]
 
 
 class ProductRouteFormat(BaseModel):
-    action: Literal["subscribe", "search", "terminate", "apply_loan", "unsupported"] = Field(
+    action: Literal["subscribe", "search", "terminate", "apply_loan", "rename", "unsupported"] = Field(
         description=(
             "사용자 요청이 상품 도메인에서 무엇에 해당하는지.\n"
             "- subscribe: 예금/적금 가입 (예: '적금 가입하고 싶어')\n"
             "- search: 가입 상품/대출 조회\n"
             "- terminate: 예금/적금 해지\n"
             "- apply_loan: 대출 신청\n"
+            "- rename: 상품 별칭 변경 (예: '상품 별칭 바꿔줘', '내집마련예금을 결혼자금으로 바꿔줘')\n"
             "- unsupported: 위 어디에도 해당 안 되면"
         )
     )
@@ -44,6 +45,11 @@ class ProductSearchFormat(BaseModel):
 
 class TerminateProductFormat(BaseModel):
     product_hint: Optional[str] = Field(default=None, description="해지할 상품(상품 ID 또는 별칭). 상품이 하나뿐이면 null 가능")
+
+
+class RenameProductFormat(BaseModel):
+    product_hint: Optional[str] = Field(default=None, description="별칭을 바꿀 상품(상품 ID 또는 기존 별칭). 상품이 하나뿐이면 null 가능")
+    new_alias: Optional[str] = Field(default=None, description="새로 설정할 별칭. 언급 없으면 null")
 
 
 class LoanApplyFormat(BaseModel):
@@ -66,6 +72,15 @@ def classify_product_action(state: ProductState):
     return {"action": result.action}
 
 
+GUIDE_SUBSCRIBE = (
+    "예금/적금 가입을 진행할게요. 다음 정보를 알려주세요.\n"
+    "- 원금을 뺄 계좌 (계좌가 여러 개면 필수)\n"
+    "- 가입 금액 (예금은 한 번에 넣을 총액, 적금은 매달 납입액)\n"
+    "- 상품 별칭 (선택, 안 정하면 상품명으로 대체돼요)\n"
+    "- 적금이면 매달 납입일 (안 말하면 기본값 25일)"
+)
+
+
 def subscribe_product(state: ProductState):
     accounts = load_accounts(state["user_id"])
 
@@ -74,22 +89,21 @@ def subscribe_product(state: ProductState):
 
     account_num = find_account_number(accounts, result.account_hint)
     if account_num is None:
-        return {"response": "원금을 뺄 계좌를 특정할 수 없어요. 계좌번호나 별칭을 알려주세요."}
+        return {"response": GUIDE_SUBSCRIBE}
 
     if result.amount is None:
-        return {"response": "가입 금액을 알려주세요."}
+        return {"response": GUIDE_SUBSCRIBE}
 
     if result.amount <= 0:
         return {"response": "가입 금액이 올바르지 않아요."}
 
-    choice = interrupt({
-        "question": "가입할 상품을 번호로 선택해주세요.",
-        "options": format_catalog(),
-    })
-
-    resolved = resolve_catalog_choice(choice)
-    if resolved is None:
-        return {"response": "선택한 상품을 찾을 수 없어요."}
+    question = "가입할 상품을 번호로 선택해주세요."
+    resolved = None
+    while resolved is None:
+        choice = interrupt({"question": question, "options": format_catalog()})
+        resolved = resolve_catalog_choice(choice)
+        if resolved is None:
+            question = "선택한 상품을 찾을 수 없어요. 다시 번호로 선택해주세요."
     product_name, catalog = resolved
 
     # 정기예금은 목돈을 지금 바로 넣는 거라 잔액이 있어야 함. 정기적금은 매달 납입이라
@@ -160,10 +174,14 @@ def search_product(state: ProductState):
     else:
         target = {
             pid: product for pid, product in products.items()
-            if pid == result.product_hint or product["alias"] == result.product_hint
+            if pid == result.product_hint
+            or result.product_hint in product["alias"] or product["alias"] in result.product_hint
         }
 
     return {"response": format_products(target)}
+
+
+GUIDE_TERMINATE_PRODUCT = "예금/적금 해지를 진행할게요. 해지할 상품(상품번호 또는 별칭)을 알려주세요."
 
 
 def terminate_product(state: ProductState):
@@ -174,7 +192,7 @@ def terminate_product(state: ProductState):
 
     product_id = find_product_id(products, result.product_hint)
     if product_id is None:
-        return {"response": "존재하지 않는 상품이에요."}
+        return {"response": GUIDE_TERMINATE_PRODUCT}
 
     product = products[product_id]
 
@@ -200,6 +218,16 @@ def terminate_product(state: ProductState):
     return {"response": f"'{product['alias']}' 해지 완료, {payout:,}원 입금했어요."}
 
 
+GUIDE_APPLY_LOAN = (
+    "대출 신청을 진행할게요. 다음 정보를 알려주세요.\n"
+    "- 대출금을 받을 계좌\n"
+    "- 대출 금액\n"
+    "- 대출 기간 (개월)\n"
+    "- 대출 별칭 (선택)\n"
+    "- 매달 상환일 (안 말하면 기본값 25일)"
+)
+
+
 def apply_loan(state: ProductState):
     accounts = load_accounts(state["user_id"])
 
@@ -208,10 +236,10 @@ def apply_loan(state: ProductState):
 
     account_num = find_account_number(accounts, result.account_hint)
     if account_num is None:
-        return {"response": "대출금을 받을 계좌를 특정할 수 없어요. 계좌번호나 별칭을 알려주세요."}
+        return {"response": GUIDE_APPLY_LOAN}
 
     if result.amount is None or result.term_months is None:
-        return {"response": "대출 금액과 기간을 알려주세요."}
+        return {"response": GUIDE_APPLY_LOAN}
 
     if result.amount <= 0 or result.term_months <= 0:
         return {"response": "대출 금액/기간이 올바르지 않아요."}
@@ -258,3 +286,26 @@ def apply_loan(state: ProductState):
             f"매달 {payment_day}일에 {monthly_payment:,}원씩 자동 상환돼요."
         )
     }
+
+
+GUIDE_RENAME_PRODUCT = "상품 별칭을 변경할게요. 어느 상품인지, 새 별칭을 뭘로 할지 알려주세요."
+
+
+def rename_product(state: ProductState):
+    products = load_products(state["user_id"])
+
+    rename_llm = light_llm.with_structured_output(RenameProductFormat)
+    result = rename_llm.invoke(state["request"])
+
+    product_id = find_product_id(products, result.product_hint)
+    if product_id is None:
+        return {"response": GUIDE_RENAME_PRODUCT}
+
+    if result.new_alias is None:
+        return {"response": GUIDE_RENAME_PRODUCT}
+
+    old_alias = products[product_id]["alias"]
+    products[product_id]["alias"] = result.new_alias
+    save_products(state["user_id"], products)
+
+    return {"response": f"'{old_alias}' 상품 별칭을 '{result.new_alias}'(으)로 변경했어요."}
