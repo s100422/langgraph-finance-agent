@@ -3,6 +3,7 @@ from pydantic import BaseModel, Field
 from datetime import datetime
 from langgraph_finance_agent.llm import llm, light_llm
 from langgraph.types import Command, interrupt
+from langgraph_finance_agent.tools import MAX_SELECT_RETRY
 from .tools import load_accounts,save_accounts,generate_account_number,format_accounts,register_account,find_account_number,find_user,execute_transfer, unregister_account
 
 class AccountState(TypedDict):
@@ -197,8 +198,9 @@ def terminate_account(state: AccountState):
         if not decision:
             return {"response": "해지를 취소했어요."}
         
-        question = "어느 계좌로 이체하실래요?"
+        question = "어느 계좌로 이체하실래요? (취소하려면 '취소'라고 입력)"
         to_account = None
+        failed = 0
         while to_account is None:
             to_hint = interrupt(
                 {
@@ -207,9 +209,14 @@ def terminate_account(state: AccountState):
                     "options": format_accounts(other_accounts, None, None),
                 }
             )
+            if str(to_hint).strip() == "취소":
+                return {"response": "해지를 취소했어요."}
             to_account = find_account_number(other_accounts, to_hint)
             if to_account is None:
-                question = "선택한 계좌를 찾을 수 없어요. 다시 선택해주세요."
+                failed += 1
+                if failed >= MAX_SELECT_RETRY:
+                    return {"response": "이체할 계좌를 찾지 못해 해지를 중단했어요."}
+                question = "선택한 계좌를 찾을 수 없어요. 다시 선택해주세요. (취소하려면 '취소'라고 입력)"
 
         execute_transfer(state["user_id"], my_accounts, target_account, state["user_id"], to_account, my_accounts[target_account]["balance"], state["today"])
 

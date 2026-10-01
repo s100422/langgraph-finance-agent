@@ -2,6 +2,7 @@ from typing import Optional, TypedDict, Literal
 from pydantic import BaseModel, Field
 from langgraph_finance_agent.llm import light_llm
 from langgraph.types import interrupt
+from langgraph_finance_agent.tools import MAX_SELECT_RETRY
 from langgraph_finance_agent.account.tools import (
     load_accounts, find_account_number, withdraw,
     format_accounts
@@ -111,16 +112,31 @@ def register_bill_payment(state: BillPaymentState):
     if result.customer_number is None:
         return {"response": GUIDE_REGISTER_BILL}
 
+    if not accounts:
+        return {"response": "연결할 계좌가 없어요. 먼저 계좌를 개설해주세요."}
+
     question = f"""
-'{result.bill_type}'에 연결할 계좌번호를 입력하세요.
+'{result.bill_type}'에 연결할 계좌번호를 입력하세요. (취소하려면 '취소'라고 입력)
 {format_accounts(accounts, None, None)}
 """
     account_num = None
+    failed = 0
     while account_num is None:
         decision = interrupt({"question": question})
+        if str(decision).strip() == "취소":
+            return {"response": "자동이체 등록을 취소했어요."}
         account_num = find_account_number(accounts, decision)
         if account_num is None:
-            question = f"계좌를 찾을 수 없어요. 다시 입력해주세요.\n{format_accounts(accounts, None, None)}"
+            failed += 1
+            if failed >= MAX_SELECT_RETRY:
+                return {
+                    "response": "계좌를 찾지 못해 자동이체 등록을 중단했어요. "
+                    "계좌 목록을 확인하시거나, 계좌가 없다면 먼저 계좌를 개설해주세요."
+                }
+            question = (
+                "계좌를 찾을 수 없어요. 다시 입력해주세요. (취소하려면 '취소'라고 입력)\n"
+                f"{format_accounts(accounts, None, None)}"
+            )
 
     bill_payment = load_bill_payments(state["user_id"])
     bill_payment_id = generate_bill_payment_id(bill_payment)

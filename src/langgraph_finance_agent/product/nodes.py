@@ -2,6 +2,7 @@ from typing import Optional, TypedDict, Literal
 from pydantic import BaseModel, Field
 from langgraph_finance_agent.llm import light_llm
 from langgraph.types import interrupt
+from langgraph_finance_agent.tools import MAX_SELECT_RETRY
 from langgraph_finance_agent.account.tools import load_accounts, find_account_number, withdraw, deposit
 from .tools import (
     PRODUCT_CATALOG, LOAN_PRODUCT_NAME, LOAN_RATE, load_products, save_products,
@@ -97,13 +98,19 @@ def subscribe_product(state: ProductState):
     if result.amount <= 0:
         return {"response": "가입 금액이 올바르지 않아요."}
 
-    question = "가입할 상품을 번호로 선택해주세요."
+    question = "가입할 상품을 번호로 선택해주세요. (취소하려면 '취소'라고 입력)"
     resolved = None
+    failed = 0
     while resolved is None:
         choice = interrupt({"question": question, "options": format_catalog()})
+        if str(choice).strip() == "취소":
+            return {"response": "가입을 취소했어요."}
         resolved = resolve_catalog_choice(choice)
         if resolved is None:
-            question = "선택한 상품을 찾을 수 없어요. 다시 번호로 선택해주세요."
+            failed += 1
+            if failed >= MAX_SELECT_RETRY:
+                return {"response": "상품을 선택하지 못해 가입을 중단했어요."}
+            question = "선택한 상품을 찾을 수 없어요. 다시 번호로 선택해주세요. (취소하려면 '취소'라고 입력)"
     product_name, catalog = resolved
 
     # 정기예금은 목돈을 지금 바로 넣는 거라 잔액이 있어야 함. 정기적금은 매달 납입이라

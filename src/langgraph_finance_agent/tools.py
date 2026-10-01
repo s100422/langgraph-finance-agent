@@ -4,6 +4,9 @@ from pathlib import Path
 
 DATA_DIR = Path("data")
 
+# 계좌/상품 선택 질문에서 잘못 답할 수 있는 최대 횟수. 넘으면 흐름을 중단해 무한 재질문을 막는다.
+MAX_SELECT_RETRY = 3
+
 
 def load_json(prefix: str, user_id: str) -> dict:
     path = DATA_DIR / f"{prefix}_{user_id}.json"
